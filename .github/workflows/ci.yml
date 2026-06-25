@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check buzzwords list loads
+        run: python -c "from buzzwords import BUZZWORDS; assert len(BUZZWORDS) > 0"
+
+      - name: Check analyzer runs
+        run: |
+          python -c "
+          from analyzer import analyze_posts
+          results = analyze_posts('Excited to leverage synergy and disrupt the ecosystem.')
+          assert len(results) == 1
+          assert results[0]['rule_based_score'] >= 0
+          print('Analyzer OK:', results[0])
+          "
+
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 . --max-line-length=100 --exclude=.github
