@@ -157,3 +157,4 @@ if analyze_btn:
                     st.success(data["rewrite"])
                 else:
                     st.warning(f"Gemini error: {gemini.get('error', 'Unknown error')}")
+                    
