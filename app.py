@@ -18,13 +18,14 @@ st.markdown("""
     margin-bottom: 1.5rem;
 }
 .metric-card {
-    background: #f8f8f6;
+    background: rgba(128,128,128,0.1);
+    border: 0.5px solid rgba(128,128,128,0.2);
     border-radius: 8px;
     padding: 14px 16px;
 }
 .metric-label {
     font-size: 12px;
-    color: #888;
+    color: rgba(128,128,128,0.9);
     margin: 0 0 4px;
 }
 .metric-value {
@@ -34,13 +35,13 @@ st.markdown("""
 }
 .metric-sub {
     font-size: 11px;
-    color: #aaa;
+    color: rgba(128,128,128,0.7);
     margin: 4px 0 0;
 }
 .section-title {
     font-size: 12px;
     font-weight: 600;
-    color: #888;
+    color: rgba(128,128,128,0.9);
     text-transform: uppercase;
     letter-spacing: .05em;
     margin: 0 0 10px;
@@ -53,7 +54,6 @@ st.markdown("""
 }
 .bar-label {
     font-size: 13px;
-    color: #333;
     min-width: 140px;
     white-space: nowrap;
     overflow: hidden;
@@ -62,7 +62,7 @@ st.markdown("""
 .bar-track {
     flex: 1;
     height: 6px;
-    background: #efefed;
+    background: rgba(128,128,128,0.15);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -73,8 +73,8 @@ st.markdown("""
     text-align: right;
 }
 .post-card {
-    background: #fff;
-    border: 0.5px solid #e0e0dc;
+    background: rgba(128,128,128,0.05);
+    border: 0.5px solid rgba(128,128,128,0.2);
     border-radius: 12px;
     padding: 1rem 1.25rem;
     margin-bottom: 12px;
@@ -89,13 +89,12 @@ st.markdown("""
     font-size: 14px;
     font-weight: 600;
     margin: 0;
-    color: #222;
 }
 .post-excerpt {
     font-size: 13px;
-    color: #555;
+    color: rgba(128,128,128,0.9);
     line-height: 1.6;
-    border-left: 2px solid #ddd;
+    border-left: 2px solid rgba(128,128,128,0.3);
     padding-left: 10px;
     margin: 0 0 10px;
 }
@@ -115,13 +114,12 @@ st.markdown("""
     font-size: 11px;
     padding: 3px 8px;
     border-radius: 20px;
-    background: #FCEBEB;
-    color: #A32D2D;
+    background: rgba(220,38,38,0.15);
+    color: #f87171;
 }
 .verdict-box {
     font-size: 13px;
-    color: #444;
-    background: #f8f8f6;
+    background: rgba(128,128,128,0.1);
     border-radius: 8px;
     padding: 10px 12px;
     margin-bottom: 10px;
@@ -130,29 +128,28 @@ st.markdown("""
 .verdict-label {
     font-size: 11px;
     font-weight: 600;
-    color: #999;
+    color: rgba(128,128,128,0.7);
     display: block;
     margin-bottom: 4px;
 }
 .rewrite-box {
     font-size: 13px;
-    color: #27500A;
-    background: #EAF3DE;
+    background: rgba(74,156,47,0.15);
     border-radius: 8px;
     padding: 10px 12px;
     line-height: 1.5;
+    color: #86efac;
 }
 .rewrite-label {
     font-size: 11px;
     font-weight: 600;
-    color: #3B6D11;
+    color: #4ade80;
     display: block;
     margin-bottom: 4px;
 }
 .reasons-box {
     font-size: 13px;
-    color: #444;
-    background: #f8f8f6;
+    background: rgba(128,128,128,0.1);
     border-radius: 8px;
     padding: 10px 12px;
     margin-bottom: 10px;
@@ -160,7 +157,7 @@ st.markdown("""
 }
 .divider {
     border: none;
-    border-top: 0.5px solid #e0e0dc;
+    border-top: 0.5px solid rgba(128,128,128,0.2);
     margin: 1.2rem 0;
 }
 </style>
@@ -169,15 +166,15 @@ st.markdown("""
 
 def score_color(score):
     if score <= 20:
-        return "#639922", "#EAF3DE", "#27500A"
+        return "#4a9c2f", "#d4edbc", "#27500A"
     elif score <= 40:
-        return "#BA7517", "#FAEEDA", "#633806"
+        return "#c47f17", "#fde8b0", "#7a4f0a"
     elif score <= 60:
-        return "#EF9F27", "#FFF3DC", "#854F0B"
+        return "#d97706", "#fef3c7", "#92400e"
     elif score <= 80:
-        return "#E24B4A", "#FCEBEB", "#A32D2D"
+        return "#dc2626", "#fee2e2", "#991b1b"
     else:
-        return "#A32D2D", "#FCEBEB", "#7A1F1F"
+        return "#991b1b", "#fee2e2", "#7f1d1d"
 
 
 def score_label(score):
@@ -308,7 +305,7 @@ def render_post_card(result, use_llm):
             """
         else:
             gemini_html = f"""
-            <div class="verdict-box" style="color:#A32D2D">
+            <div class="verdict-box" style="color:#f87171">
                 Gemini error: {gemini.get('error', 'Unknown error')}
             </div>
             """
@@ -404,4 +401,4 @@ if analyze_btn:
     st.markdown('<p class="section-title">Per-post breakdown</p>', unsafe_allow_html=True)
 
     for result in results:
-        render_post_card(result, use_llm)                   
+        render_post_card(result, use_llm)
