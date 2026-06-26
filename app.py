@@ -279,7 +279,7 @@ def render_post_card(result, use_llm):
     excerpt = result["text"][:120] + "..." if len(result["text"]) > 120 else result["text"]
 
     tags_html = "".join(
-        f'<span class="tag">{item["buzzword"]} ×{item["count"]}</span>'
+        f'<span class="tag">{item["buzzword"]} &times;{item["count"]}</span>'
         for item in result["buzzwords"]
     )
 
@@ -304,9 +304,12 @@ def render_post_card(result, use_llm):
             </div>
             """
         else:
+            import html
+            safe_error = html.escape(str(gemini.get('error', 'Unknown error')))
             gemini_html = f"""
             <div class="verdict-box" style="color:#f87171">
-                Gemini error: {gemini.get('error', 'Unknown error')}
+                <span class="verdict-label">Gemini error</span>
+                {safe_error[:200]}
             </div>
             """
 
@@ -314,14 +317,14 @@ def render_post_card(result, use_llm):
     <div class="post-card">
         <div class="post-header">
             <p class="post-title">Post {result['index']}
-                <span style="font-size:12px;color:#aaa;font-weight:400"> · {label}</span>
+                <span style="font-size:12px;color:rgba(128,128,128,0.7);font-weight:400"> &middot; {label}</span>
             </p>
             <span class="score-badge" style="background:{badge_bg};color:{badge_text}">
                 {score}/100
             </span>
         </div>
         <p class="post-excerpt">{excerpt}</p>
-        <div class="tags">{tags_html if tags_html else '<span style="font-size:12px;color:#aaa">No buzzwords detected</span>'}</div>
+        <div class="tags">{tags_html if tags_html else '<span style="font-size:12px;color:rgba(128,128,128,0.6)">No buzzwords detected</span>'}</div>
         {gemini_html}
     </div>
     """, unsafe_allow_html=True)
