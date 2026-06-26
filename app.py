@@ -305,13 +305,13 @@ def render_post_card(result, use_llm):
             """
         else:
             import html
-            safe_error = html.escape(str(gemini.get('error', 'Unknown error')))
-            gemini_html = f"""
-            <div class="verdict-box" style="color:#f87171">
-                <span class="verdict-label">Gemini error</span>
-                {safe_error[:200]}
-            </div>
-            """
+            safe_error = html.escape(str(gemini.get('error', 'Unknown error')))[:200]
+            gemini_html = (
+                '<div class="verdict-box" style="color:#f87171">'
+                '<span class="verdict-label">Gemini error</span>'
+                + safe_error +
+                '</div>'
+            )
 
     st.markdown(f"""
     <div class="post-card">
