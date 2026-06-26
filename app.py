@@ -1,5 +1,4 @@
 import streamlit as st
-import plotly.express as px
 import pandas as pd
 from analyzer import analyze_posts, get_frequency_map
 from llm import analyze_all_posts
@@ -10,30 +9,356 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🎯 LinkedIn Buzzword Analyzer")
-st.caption("Paste LinkedIn captions below. Separate multiple posts with a blank line or `---`.")
+st.markdown("""
+<style>
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+}
+.metric-card {
+    background: #f8f8f6;
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+.metric-label {
+    font-size: 12px;
+    color: #888;
+    margin: 0 0 4px;
+}
+.metric-value {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+}
+.metric-sub {
+    font-size: 11px;
+    color: #aaa;
+    margin: 4px 0 0;
+}
+.section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin: 0 0 10px;
+}
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.bar-label {
+    font-size: 13px;
+    color: #333;
+    min-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bar-track {
+    flex: 1;
+    height: 6px;
+    background: #efefed;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.bar-num {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 28px;
+    text-align: right;
+}
+.post-card {
+    background: #fff;
+    border: 0.5px solid #e0e0dc;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 12px;
+}
+.post-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.post-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    color: #222;
+}
+.post-excerpt {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.6;
+    border-left: 2px solid #ddd;
+    padding-left: 10px;
+    margin: 0 0 10px;
+}
+.score-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: #FCEBEB;
+    color: #A32D2D;
+}
+.verdict-box {
+    font-size: 13px;
+    color: #444;
+    background: #f8f8f6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+.verdict-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #999;
+    display: block;
+    margin-bottom: 4px;
+}
+.rewrite-box {
+    font-size: 13px;
+    color: #27500A;
+    background: #EAF3DE;
+    border-radius: 8px;
+    padding: 10px 12px;
+    line-height: 1.5;
+}
+.rewrite-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #3B6D11;
+    display: block;
+    margin-bottom: 4px;
+}
+.reasons-box {
+    font-size: 13px;
+    color: #444;
+    background: #f8f8f6;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+.divider {
+    border: none;
+    border-top: 0.5px solid #e0e0dc;
+    margin: 1.2rem 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+def score_color(score):
+    if score <= 20:
+        return "#639922", "#EAF3DE", "#27500A"
+    elif score <= 40:
+        return "#BA7517", "#FAEEDA", "#633806"
+    elif score <= 60:
+        return "#EF9F27", "#FFF3DC", "#854F0B"
+    elif score <= 80:
+        return "#E24B4A", "#FCEBEB", "#A32D2D"
+    else:
+        return "#A32D2D", "#FCEBEB", "#7A1F1F"
+
+
+def score_label(score):
+    if score <= 20:
+        return "Genuine 🟢"
+    elif score <= 40:
+        return "Mild jargon 🟡"
+    elif score <= 60:
+        return "Corporate tone 🟠"
+    elif score <= 80:
+        return "Heavy jargon 🔴"
+    else:
+        return "Peak LinkedIn 💀"
+
+
+def render_metric_cards(results, freq_map):
+    scores = []
+    for r in results:
+        if r.get("gemini", {}).get("success"):
+            scores.append(r["gemini"]["data"]["cringe_score"])
+        else:
+            scores.append(r["rule_based_score"])
+
+    avg_score = int(sum(scores) / len(scores)) if scores else 0
+    total_buzzwords = sum(len(r["buzzwords"]) for r in results)
+    top_word = list(freq_map.keys())[0] if freq_map else "—"
+    peak_count = sum(1 for s in scores if s >= 80)
+
+    avg_color, _, _ = score_color(avg_score)
+
+    st.markdown(f"""
+    <div class="metric-grid">
+        <div class="metric-card">
+            <p class="metric-label">Average cringe score</p>
+            <p class="metric-value" style="color:{avg_color}">{avg_score}/100</p>
+            <p class="metric-sub">across {len(results)} post(s)</p>
+        </div>
+        <div class="metric-card">
+            <p class="metric-label">Total buzzwords</p>
+            <p class="metric-value">{total_buzzwords}</p>
+            <p class="metric-sub">unique hits</p>
+        </div>
+        <div class="metric-card">
+            <p class="metric-label">Most used</p>
+            <p class="metric-value" style="font-size:16px;padding-top:5px">{top_word}</p>
+            <p class="metric-sub">×{freq_map.get(top_word, 0)} across posts</p>
+        </div>
+        <div class="metric-card">
+            <p class="metric-label">Peak LinkedIn 💀</p>
+            <p class="metric-value">{peak_count}</p>
+            <p class="metric-sub">post(s) scored 80+</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_score_bars(results, freq_map):
+    st.markdown('<p class="section-title">Cringe leaderboard</p>', unsafe_allow_html=True)
+    for r in results:
+        if r.get("gemini", {}).get("success"):
+            score = r["gemini"]["data"]["cringe_score"]
+        else:
+            score = r["rule_based_score"]
+
+        bar_color, _, _ = score_color(score)
+        st.markdown(f"""
+        <div class="bar-row">
+            <span class="bar-label">Post {r['index']}</span>
+            <div class="bar-track">
+                <div style="width:{score}%;height:100%;background:{bar_color};border-radius:3px"></div>
+            </div>
+            <span class="bar-num" style="color:{bar_color}">{score}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Top buzzwords across all posts</p>', unsafe_allow_html=True)
+
+    top_words = list(freq_map.items())[:8]
+    max_count = top_words[0][1] if top_words else 1
+    for word, count in top_words:
+        pct = int((count / max_count) * 100)
+        st.markdown(f"""
+        <div class="bar-row">
+            <span class="bar-label">{word}</span>
+            <div class="bar-track">
+                <div style="width:{pct}%;height:100%;background:#7F77DD;border-radius:3px"></div>
+            </div>
+            <span class="bar-num" style="color:#534AB7">×{count}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def render_post_card(result, use_llm):
+    if use_llm and result.get("gemini", {}).get("success"):
+        score = result["gemini"]["data"]["cringe_score"]
+    else:
+        score = result["rule_based_score"]
+
+    bar_color, badge_bg, badge_text = score_color(score)
+    label = score_label(score)
+    excerpt = result["text"][:120] + "..." if len(result["text"]) > 120 else result["text"]
+
+    tags_html = "".join(
+        f'<span class="tag">{item["buzzword"]} ×{item["count"]}</span>'
+        for item in result["buzzwords"]
+    )
+
+    gemini_html = ""
+    if use_llm:
+        gemini = result.get("gemini", {})
+        if gemini.get("success"):
+            data = gemini["data"]
+            reasons_html = "".join(f"<li>{r}</li>" for r in data["reasons"])
+            gemini_html = f"""
+            <div class="verdict-box">
+                <span class="verdict-label">Gemini verdict</span>
+                {data['verdict']}
+            </div>
+            <div class="reasons-box">
+                <span class="verdict-label">Why it feels corporate</span>
+                <ul style="margin:0;padding-left:16px">{reasons_html}</ul>
+            </div>
+            <div class="rewrite-box">
+                <span class="rewrite-label">Suggested rewrite</span>
+                {data['rewrite']}
+            </div>
+            """
+        else:
+            gemini_html = f"""
+            <div class="verdict-box" style="color:#A32D2D">
+                Gemini error: {gemini.get('error', 'Unknown error')}
+            </div>
+            """
+
+    st.markdown(f"""
+    <div class="post-card">
+        <div class="post-header">
+            <p class="post-title">Post {result['index']}
+                <span style="font-size:12px;color:#aaa;font-weight:400"> · {label}</span>
+            </p>
+            <span class="score-badge" style="background:{badge_bg};color:{badge_text}">
+                {score}/100
+            </span>
+        </div>
+        <p class="post-excerpt">{excerpt}</p>
+        <div class="tags">{tags_html if tags_html else '<span style="font-size:12px;color:#aaa">No buzzwords detected</span>'}</div>
+        {gemini_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+st.markdown("## 🎯 LinkedIn buzzword analyzer")
+st.caption("Paste captions below. Separate multiple posts with a blank line or `---`.")
 
 with st.sidebar:
     st.header("How to use")
     st.markdown("""
     1. Paste one or more LinkedIn captions
     2. Or upload a `.txt` file
-    3. Click **Analyze**
-    4. Get your cringe score
+    3. Toggle Gemini AI on or off
+    4. Click **Analyze**
     """)
     st.divider()
-    st.markdown("Separate multiple posts with a blank line or `---`")
-
+    st.markdown("**Score guide**")
+    st.markdown("""
+    - 🟢 0–20 · Genuine
+    - 🟡 21–40 · Mild jargon
+    - 🟠 41–60 · Corporate tone
+    - 🔴 61–80 · Heavy jargon
+    - 💀 81–100 · Peak LinkedIn
+    """)
 
 input_tab, upload_tab = st.tabs(["Paste text", "Upload file"])
-
 raw_text = ""
 
 with input_tab:
     raw_text_input = st.text_area(
         "LinkedIn captions",
-        height=250,
-        placeholder="Excited to announce that I've leveraged my growth mindset to disrupt the ecosystem...",
+        height=220,
+        placeholder="Excited to announce I've leveraged my growth mindset to disrupt the ecosystem...",
     )
     if raw_text_input:
         raw_text = raw_text_input
@@ -42,16 +367,14 @@ with upload_tab:
     uploaded_file = st.file_uploader("Upload a .txt file", type=["txt"])
     if uploaded_file:
         raw_text = uploaded_file.read().decode("utf-8")
-        st.success(f"Loaded file: {uploaded_file.name}")
-        st.text_area("Preview", raw_text, height=200, disabled=True)
-
+        st.success(f"Loaded: {uploaded_file.name}")
+        st.text_area("Preview", raw_text, height=180, disabled=True)
 
 col1, col2 = st.columns([1, 4])
 with col1:
     analyze_btn = st.button("Analyze", type="primary", use_container_width=True)
 with col2:
     use_llm = st.toggle("Enable Gemini AI analysis", value=True)
-
 
 if analyze_btn:
     if not raw_text.strip():
@@ -62,7 +385,7 @@ if analyze_btn:
         results = analyze_posts(raw_text)
 
     if not results:
-        st.error("No posts detected. Make sure posts are separated by a blank line or `---`.")
+        st.error("No posts detected. Separate posts with a blank line or `---`.")
         st.stop()
 
     if use_llm:
@@ -70,91 +393,15 @@ if analyze_btn:
             results = analyze_all_posts(results)
 
     st.divider()
-    st.subheader(f"Results — {len(results)} post(s) analyzed")
 
     freq_map = get_frequency_map(results)
+    render_metric_cards(results, freq_map)
 
-    if freq_map:
-        st.subheader("Buzzword frequency across all posts")
-        df = pd.DataFrame(
-            list(freq_map.items())[:20],
-            columns=["Buzzword", "Count"]
-        )
-        fig = px.bar(
-            df,
-            x="Count",
-            y="Buzzword",
-            orientation="h",
-            color="Count",
-            color_continuous_scale="Reds",
-        )
-        fig.update_layout(
-            yaxis=dict(autorange="reversed"),
-            coloraxis_showscale=False,
-            margin=dict(l=0, r=0, t=0, b=0),
-            height=max(300, len(df) * 28),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No buzzwords detected across any posts.")
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    render_score_bars(results, freq_map)
 
-    st.divider()
-    st.subheader("Per-post breakdown")
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Per-post breakdown</p>', unsafe_allow_html=True)
 
     for result in results:
-        post_preview = result["text"][:60] + "..." if len(result["text"]) > 60 else result["text"]
-        rule_score = result["rule_based_score"]
-
-        if use_llm and result.get("gemini", {}).get("success"):
-            cringe_score = result["gemini"]["data"]["cringe_score"]
-        else:
-            cringe_score = rule_score
-
-        if cringe_score <= 20:
-            badge = "🟢 Genuine"
-        elif cringe_score <= 40:
-            badge = "🟡 Mild Jargon"
-        elif cringe_score <= 60:
-            badge = "🟠 Corporate Tone"
-        elif cringe_score <= 80:
-            badge = "🔴 Heavy Jargon"
-        else:
-            badge = "💀 Peak LinkedIn"
-
-        with st.expander(f"Post {result['index']} — {badge} ({cringe_score}/100) — {post_preview}"):
-
-            st.markdown("**Original post**")
-            st.text(result["text"])
-
-            st.divider()
-
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric("Cringe Score", f"{cringe_score}/100")
-            with col_b:
-                st.metric("Buzzwords found", len(result["buzzwords"]))
-
-            if result["buzzwords"]:
-                st.markdown("**Buzzwords detected**")
-                buzzword_tags = " ".join(
-                    [f"`{item['buzzword']}` ×{item['count']}" for item in result["buzzwords"]]
-                )
-                st.markdown(buzzword_tags)
-
-            if use_llm:
-                gemini = result.get("gemini", {})
-                if gemini.get("success"):
-                    data = gemini["data"]
-                    st.divider()
-                    st.markdown("**Gemini verdict**")
-                    st.info(data["verdict"])
-
-                    st.markdown("**Why it feels corporate**")
-                    for reason in data["reasons"]:
-                        st.markdown(f"- {reason}")
-
-                    st.markdown("**Suggested rewrite**")
-                    st.success(data["rewrite"])
-                else:
-                    st.warning(f"Gemini error: {gemini.get('error', 'Unknown error')}")
-                    
+        render_post_card(result, use_llm)                   
