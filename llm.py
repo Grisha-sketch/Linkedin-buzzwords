@@ -1,20 +1,25 @@
 import os
 import json
 import google.generativeai as genai
+from google.generativeai import GenerativeModel
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-2.0-flash-latest")
+genai.configure(
+    api_key=os.getenv("GEMINI_API_KEY"),
+    client_options={"api_endpoint": "generativelanguage.googleapis.com"}
+)
+
+model = GenerativeModel("gemini-2.0-flash")
 
 
 SYSTEM_PROMPT = """
-You are an expert at analyzing LinkedIn posts for corporate jargon, 
-buzzwords, and performative language. You give honest, slightly witty 
+You are an expert at analyzing LinkedIn posts for corporate jargon,
+buzzwords, and performative language. You give honest, slightly witty
 but fair assessments.
 
-You will be given a LinkedIn caption. Analyze it and return a JSON object 
+You will be given a LinkedIn caption. Analyze it and return a JSON object
 with exactly these fields:
 
 {
@@ -41,7 +46,6 @@ def analyze_with_gemini(post_text: str) -> dict:
     try:
         response = model.generate_content(prompt)
         raw = response.text.strip()
-
         raw = raw.replace("```json", "").replace("```", "").strip()
         result = json.loads(raw)
 
@@ -52,15 +56,9 @@ def analyze_with_gemini(post_text: str) -> dict:
         return {"success": True, "data": result}
 
     except json.JSONDecodeError:
-        return {
-            "success": False,
-            "error": "Gemini returned invalid JSON. Try again.",
-        }
+        return {"success": False, "error": "Gemini returned invalid JSON. Try again."}
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-        }
+        return {"success": False, "error": str(e)}
 
 
 def analyze_all_posts(posts: list[dict]) -> list[dict]:
