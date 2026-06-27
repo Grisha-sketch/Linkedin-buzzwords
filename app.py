@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from analyzer import analyze_posts, get_frequency_map
 from llm import analyze_all_posts
 
@@ -200,9 +199,9 @@ def render_metric_cards(results, freq_map):
 
     avg_score = int(sum(scores) / len(scores)) if scores else 0
     total_buzzwords = sum(len(r["buzzwords"]) for r in results)
-    top_word = list(freq_map.keys())[0] if freq_map else "—"
+    top_word = list(freq_map.keys())[0] if freq_map else "none"
+    top_count = freq_map.get(top_word, 0)
     peak_count = sum(1 for s in scores if s >= 80)
-
     avg_color, _, _ = score_color(avg_score)
 
     st.markdown(f"""
@@ -219,8 +218,9 @@ def render_metric_cards(results, freq_map):
         </div>
         <div class="metric-card">
             <p class="metric-label">Most used</p>
-            <p class="metric-value" style="font-size:16px;padding-top:5px">{top_word}</p>
-            <p class="metric-sub">×{freq_map.get(top_word, 0)} across posts</p>
+            <p class="metric-value"
+            style="font-size:16px;padding-top:5px">{top_word}</p>
+            <p class="metric-sub">&times;{top_count} across posts</p>
         </div>
         <div class="metric-card">
             <p class="metric-label">Peak LinkedIn 💀</p>
@@ -232,7 +232,10 @@ def render_metric_cards(results, freq_map):
 
 
 def render_score_bars(results, freq_map):
-    st.markdown('<p class="section-title">Cringe leaderboard</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-title">Cringe leaderboard</p>',
+        unsafe_allow_html=True
+    )
     for r in results:
         if r.get("gemini", {}).get("success"):
             score = r["gemini"]["data"]["cringe_score"]
@@ -244,14 +247,18 @@ def render_score_bars(results, freq_map):
         <div class="bar-row">
             <span class="bar-label">Post {r['index']}</span>
             <div class="bar-track">
-                <div style="width:{score}%;height:100%;background:{bar_color};border-radius:3px"></div>
+                <div style="width:{score}%;height:100%;
+                background:{bar_color};border-radius:3px"></div>
             </div>
             <span class="bar-num" style="color:{bar_color}">{score}</span>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">Top buzzwords across all posts</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-title">Top buzzwords across all posts</p>',
+        unsafe_allow_html=True
+    )
 
     top_words = list(freq_map.items())[:8]
     max_count = top_words[0][1] if top_words else 1
@@ -261,9 +268,10 @@ def render_score_bars(results, freq_map):
         <div class="bar-row">
             <span class="bar-label">{word}</span>
             <div class="bar-track">
-                <div style="width:{pct}%;height:100%;background:#7F77DD;border-radius:3px"></div>
+                <div style="width:{pct}%;height:100%;
+                background:#7F77DD;border-radius:3px"></div>
             </div>
-            <span class="bar-num" style="color:#534AB7">×{count}</span>
+            <span class="bar-num" style="color:#534AB7">&times;{count}</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -276,62 +284,79 @@ def render_post_card(result, use_llm):
 
     bar_color, badge_bg, badge_text = score_color(score)
     label = score_label(score)
-    excerpt = result["text"][:120] + "..." if len(result["text"]) > 120 else result["text"]
+    excerpt = (
+        result["text"][:120] + "..."
+        if len(result["text"]) > 120
+        else result["text"]
+    )
 
     tags_html = "".join(
         f'<span class="tag">{item["buzzword"]} &times;{item["count"]}</span>'
         for item in result["buzzwords"]
     )
+    no_tags = '<span style="font-size:12px;color:rgba(128,128,128,0.6)">'\
+              'No buzzwords detected</span>'
 
     gemini_html = ""
     if use_llm:
         gemini = result.get("gemini", {})
         if gemini.get("success"):
             data = gemini["data"]
-            reasons_html = "".join(f"<li>{r}</li>" for r in data["reasons"])
-            gemini_html = f"""
-            <div class="verdict-box">
-                <span class="verdict-label">Gemini verdict</span>
-                {data['verdict']}
-            </div>
-            <div class="reasons-box">
-                <span class="verdict-label">Why it feels corporate</span>
-                <ul style="margin:0;padding-left:16px">{reasons_html}</ul>
-            </div>
-            <div class="rewrite-box">
-                <span class="rewrite-label">Suggested rewrite</span>
-                {data['rewrite']}
-            </div>
-            """
+            reasons_html = "".join(
+                f"<li>{r}</li>" for r in data["reasons"]
+            )
+            gemini_html = (
+                '<div class="verdict-box">'
+                '<span class="verdict-label">Gemini verdict</span>'
+                + data["verdict"]
+                + "</div>"
+                '<div class="reasons-box">'
+                '<span class="verdict-label">Why it feels corporate</span>'
+                f'<ul style="margin:0;padding-left:16px">{reasons_html}</ul>'
+                "</div>"
+                '<div class="rewrite-box">'
+                '<span class="rewrite-label">Suggested rewrite</span>'
+                + data["rewrite"]
+                + "</div>"
+            )
         else:
             import html
-            safe_error = html.escape(str(gemini.get('error', 'Unknown error')))[:200]
+            safe_err = html.escape(
+                str(gemini.get("error", "Unknown error"))
+            )[:200]
             gemini_html = (
                 '<div class="verdict-box" style="color:#f87171">'
                 '<span class="verdict-label">Gemini error</span>'
-                + safe_error +
-                '</div>'
+                + safe_err
+                + "</div>"
             )
 
+    post_num = result["index"]
     st.markdown(f"""
     <div class="post-card">
         <div class="post-header">
-            <p class="post-title">Post {result['index']}
-                <span style="font-size:12px;color:rgba(128,128,128,0.7);font-weight:400"> &middot; {label}</span>
+            <p class="post-title">Post {post_num}
+                <span style="font-size:12px;
+                color:rgba(128,128,128,0.7);font-weight:400">
+                &middot; {label}</span>
             </p>
-            <span class="score-badge" style="background:{badge_bg};color:{badge_text}">
+            <span class="score-badge"
+            style="background:{badge_bg};color:{badge_text}">
                 {score}/100
             </span>
         </div>
         <p class="post-excerpt">{excerpt}</p>
-        <div class="tags">{tags_html if tags_html else '<span style="font-size:12px;color:rgba(128,128,128,0.6)">No buzzwords detected</span>'}</div>
+        <div class="tags">{tags_html if tags_html else no_tags}</div>
         {gemini_html}
     </div>
     """, unsafe_allow_html=True)
 
 
 st.markdown("## 🎯 LinkedIn buzzword analyzer")
-st.caption("Paste captions below. Separate multiple posts with a blank line or `---`.")
+st.caption(
+    "Paste captions below. "
+    "Separate multiple posts with a blank line or `---`."
+)
 
 with st.sidebar:
     st.header("How to use")
@@ -355,10 +380,14 @@ input_tab, upload_tab = st.tabs(["Paste text", "Upload file"])
 raw_text = ""
 
 with input_tab:
+    placeholder = (
+        "Excited to announce I've leveraged my growth mindset "
+        "to disrupt the ecosystem..."
+    )
     raw_text_input = st.text_area(
         "LinkedIn captions",
         height=220,
-        placeholder="Excited to announce I've leveraged my growth mindset to disrupt the ecosystem...",
+        placeholder=placeholder,
     )
     if raw_text_input:
         raw_text = raw_text_input
@@ -372,7 +401,9 @@ with upload_tab:
 
 col1, col2 = st.columns([1, 4])
 with col1:
-    analyze_btn = st.button("Analyze", type="primary", use_container_width=True)
+    analyze_btn = st.button(
+        "Analyze", type="primary", use_container_width=True
+    )
 with col2:
     use_llm = st.toggle("Enable Gemini AI analysis", value=True)
 
@@ -385,11 +416,16 @@ if analyze_btn:
         results = analyze_posts(raw_text)
 
     if not results:
-        st.error("No posts detected. Separate posts with a blank line or `---`.")
+        st.error(
+            "No posts detected. "
+            "Separate posts with a blank line or `---`."
+        )
         st.stop()
 
     if use_llm:
-        with st.spinner(f"Analyzing {len(results)} post(s) with Gemini..."):
+        with st.spinner(
+            f"Analyzing {len(results)} post(s) with Gemini..."
+        ):
             results = analyze_all_posts(results)
 
     st.divider()
@@ -401,7 +437,10 @@ if analyze_btn:
     render_score_bars(results, freq_map)
 
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">Per-post breakdown</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="section-title">Per-post breakdown</p>',
+        unsafe_allow_html=True
+    )
 
     for result in results:
         render_post_card(result, use_llm)
